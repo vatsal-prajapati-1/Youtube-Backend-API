@@ -1,214 +1,152 @@
-import asyncHandler from "../utils/asyncHandler.js";
-import ApiError from "../utils/ApiError.js";
+import { Video } from "../models/video.models.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { ApiError } from "../utils/ApiError.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   deleteFromCloudinary,
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
-import { Video } from "../models/video.models.js";
-import ApiResponse from "../utils/ApiResponse.js";
 
-const createVideo = asyncHandler(async (req, res) => {
-  const { title, description } = req.body;
-
-  if (!title && !description)
-    throw new ApiError(400, "Title and description are required");
-
-  const videoFileLocalPath = req.files?.videoFile[0]?.path;
-
-  if (!videoFileLocalPath) throw new ApiError(400, "Video file is required");
-
-  let thumbnailLocalPath;
-
-  if (
-    req.files &&
-    Array.isArray(req.files?.thumbnail) &&
-    req.files?.thumbnail.length > 0
-  )
-    thumbnailLocalPath = req.files?.thumbnail[0]?.path;
-
-  const videoFile = await uploadOnCloudinary(videoFileLocalPath);
-
-  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-
-  if (!videoFile) throw new ApiError(400, "Video file upload failed");
-
-  if (!thumbnail) throw new ApiError(400, "Thumbnail upload failed");
-
-  const video = await Video.create({
-    videoFile: videoFile.url,
-    thumbnail: thumbnail.url || "",
-    title,
-    description,
-    duration: videoFile.duration,
-    views: 0,
-    isPublished: false,
-    owner: req.user._id,
-  });
-
-  return res
-    .status(201)
-    .json(new ApiResponse(200, video, "Video created successfully"));
-});
-
-const updateVideo = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const { title, description } = req.body;
-
-  if (!id) throw new ApiError(400, "Video id is required");
-
-  if (!title && !description)
-    throw new ApiError(400, "Title and Description are required");
-
-  const video = await Video.findById(id);
-
-  if (!video) throw new ApiError(404, "Video not found");
-
-  if (video.owner.toString() !== req.user._id.toString())
-    throw new ApiError(403, "Unauthorized");
-
-  console.log(
-    video.owner,
-    video.owner.toString(),
-    "video owner to string !!!!!"
-  );
-
-  const videoFileLocalPath = req.files?.path;
-
-  if (!videoFileLocalPath) throw new ApiError(400, "Video file is missing");
-
-  const thumbnailLocalPath = req.files?.path;
-
-  if (!thumbnailLocalPath) throw new ApiError(400, "Thumbnail file is missing");
-
-  if (video.videoFile) await deleteFromCloudinary(video.videoFile);
-
-  if (video.thumbnail) await deleteFromCloudinary(video.thumbnail);
-
-  const videoFile = await uploadOnCloudinary(videoFileLocalPath);
-
-  if (!videoFile) throw new ApiError(400, "Video file upload failed");
-
-  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
-
-  if (!thumbnail) throw new ApiError(400, "Thumbnail upload failed");
-
-  const updatedVideo = await Video.findByIdAndUpdate(
-    id,
-    {
-      $set: {
-        title: title,
-        description: description,
-        thumbnail: thumbnail.url,
-        videoFile: videoFile.url,
-      },
-    },
-    { new: true }
-  );
-
+const getAllVideos = asyncHandler(async (req, res) => {
+  const videos = await Video.find({});
   return res
     .status(200)
-    .json(new ApiResponse(200, updatedVideo, "Video updated successfully"));
+    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
-const deleteVideo = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+const getVideoById = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const video = await Video.findById(videoId);
 
-  if (!id) throw new ApiError(400, "Video id is required");
-
-  const video = await Video.findById(id);
-
-  if (!video) throw new ApiError(400, "Video not found");
-
-  if (video.owner.toString() !== req.user._id.toString())
-    throw new ApiError(403, "Unauthorized");
-
-  if (video.videoFile) await deleteFromCloudinary(video.videoFile);
-
-  if (video.thumbnail) await deleteFromCloudinary(video.thumbnail);
-
-  await Video.findByIdAndDelete(id);
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, {}, "Video deleted successfully"));
-});
-
-const getVideo = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  if (!id) throw new ApiError(400, "Video id is required");
-
-  const video = await Video.findByIdAndUpdate(
-    id,
-    {
-      $inc: { views: 1 },
-    },
-    { new: true }
-  );
-
-  if (!video) throw new ApiError(400, "Video not found");
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
 
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video fetched successfully"));
 });
 
-const getAllVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType } = req.params;
+const publishAVideo = asyncHandler(async (req, res) => {
+  const { title, description } = req.body;
 
-  const videos = await Video.aggregatePaginate(
-    Video.aggregate([
-      {
-        $match: {
-          isPublished: true,
-          ...(query && { $text: { $search: query } }),
-        },
-      },
-      {
-        $sort: {
-          [sortBy || "createdAt"]: sortType === "desc" ? -1 : 1,
-        },
-      },
-    ]),
+  if (!title || !description) {
+    throw new ApiError(400, "Title and description are required");
+  }
+
+  const videoFileLocalPath = req.files?.videoFile[0]?.path;
+  const thumbnailLocalPath = req.files?.thumbnail[0]?.path;
+
+  if (!videoFileLocalPath || !thumbnailLocalPath) {
+    throw new ApiError(400, "Video file and thumbnail are required");
+  }
+
+  const videoFile = await uploadOnCloudinary(videoFileLocalPath);
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  if (!videoFile || !thumbnail) {
+    throw new ApiError(500, "Error uploading files to cloudinary");
+  }
+
+  const video = await Video.create({
+    videoFile: videoFile.url,
+    thumbnail: thumbnail.url,
+    title,
+    description,
+    duration: videoFile.duration,
+    owner: req.user?._id,
+  });
+
+  return res
+    .status(201)
+    .json(new ApiResponse(201, video, "Video published successfully"));
+});
+
+const updateVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const { title, description } = req.body;
+
+  if (!title && !description) {
+    throw new ApiError(400, "Title or description is required");
+  }
+
+  const oldVideo = await Video.findById(videoId);
+  if (!oldVideo) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  const video = await Video.findByIdAndUpdate(
+    videoId,
     {
-      page,
-      limit,
-      customLabels: {
-        docs: "videos",
-        totalDocs: "totalVideos",
+      $set: {
+        title,
+        description,
       },
-    }
+    },
+    { new: true }
   );
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, video, "Video updated successfully"));
+});
+
+const deleteVideo = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+  const video = await Video.findById(videoId);
+
+  if (!video) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  await deleteFromCloudinary(video.videoFile);
+  await deleteFromCloudinary(video.thumbnail);
+
+  await Video.findByIdAndDelete(videoId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video deleted successfully"));
+});
+
+const getVideosByUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const videos = await Video.find({ owner: userId });
+
+  if (!videos || videos.length === 0) {
+    throw new ApiError(404, "No videos found for this user");
+  }
 
   return res
     .status(200)
     .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
-const getAllVideosOfAUser = asyncHandler(async (req, res) => {
-  const { id } = req.params;
+const togglePublishStatus = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
 
-  const { page = 1, limit = 10 } = req.query;
+  if (!videoId || !isValidObjectId(videoId)) {
+    throw new ApiError(404, "Video not found!");
+  }
 
-  if (!id) throw new ApiError(400, "User id is required");
+  const video = await Video.findById(videoId);
 
-  const videos = await Video.aggregatePaginate(
-    Video.find({ owner: id, isPublished: true }),
-    {
-      page,
-      limit,
-      customLabels: {
-        docs: "videos",
-        totalDocs: "totalVideos",
-      },
-    }
-  );
+  if (!video) {
+    throw new ApiError(404, "Video not found!");
+  }
 
-  if (!videos) throw new ApiError(400, "Videos not found");
+  video.isPublished = !video.isPublished;
+  await video.save({ validateBeforeSave: false });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
+    .json(
+      new ApiResponse(200, video, "Video publish status toggled successfully.")
+    );
 });
 
 const getAllVideosOfAChannel = asyncHandler(async (req, res) => {
@@ -220,32 +158,6 @@ const getAllVideosOfAChannel = asyncHandler(async (req, res) => {
 
   const videos = await Video.aggregatePaginate(
     Video.find({ channel: name, isPublished: true }),
-    {
-      page,
-      limit,
-      customLabels: {
-        docs: "videos",
-        totalDocs: "totalVideos",
-      },
-    }
-  );
-
-  if (!videos) throw new ApiError(400, "Videos not found");
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
-});
-
-const getAllVideosOfAPlaylist = asyncHandler(async (req, res) => {
-  const { name } = req.params;
-
-  const { page = 1, limit = 10 } = req.query;
-
-  if (!name) throw new ApiError(400, "Playlist name is required");
-
-  const videos = await Video.aggregatePaginate(
-    Video.find({ playlist: name, isPublished: true }),
     {
       page,
       limit,
@@ -310,14 +222,14 @@ const getAllVideosOfATag = asyncHandler(async (req, res) => {
 });
 
 export {
-  createVideo,
   getAllVideos,
-  getVideo,
+  getVideoById,
+  publishAVideo,
   updateVideo,
   deleteVideo,
-  getAllVideosOfAUser,
+  getVideosByUser,
+  togglePublishStatus,
   getAllVideosOfAChannel,
-  getAllVideosOfAPlaylist,
   getAllVideosOfACategory,
   getAllVideosOfATag,
 };

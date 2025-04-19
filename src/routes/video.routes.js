@@ -1,28 +1,47 @@
 import { Router } from "express";
 import {
-  createVideo,
-  deleteVideo,
   getAllVideos,
-  getAllVideosOfACategory,
-  getAllVideosOfAChannel,
-  getAllVideosOfAPlaylist,
-  getAllVideosOfATag,
-  getAllVideosOfAUser,
-  getVideo,
+  getVideoById,
+  publishAVideo,
   updateVideo,
+  deleteVideo,
+  getVideosByUser,
+  togglePublishStatus,
+  getAllVideosOfAChannel,
+  getAllVideosOfACategory,
+  getAllVideosOfATag,
 } from "../controllers/video.controller.js";
+import { upload } from "../middlewares/multer.middleware.js";
+import { jwtVerify } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
-router.route("/").post(createVideo);
 router.route("/").get(getAllVideos);
-router.route("/:id").get(getVideo);
-router.route("/:id").put(updateVideo);
-router.route("/:id").delete(deleteVideo);
-router.route("/user/:id").get(getAllVideosOfAUser);
-router.route("/c/:name").get(getAllVideosOfAChannel);
-router.route("/p/:name").get(getAllVideosOfAPlaylist);
+router.route("/:videoId").get(getVideoById);
+router.route("/user/:userId").get(getVideosByUser);
+router.route("/channel/:name").get(getAllVideosOfAChannel);
 router.route("/category/:name").get(getAllVideosOfACategory);
-router.route("/t/:name").get(getAllVideosOfATag);
+router.route("/tag/:tag").get(getAllVideosOfATag);
+
+// Secured routes
+router.route("/publish").post(
+  jwtVerify,
+  upload.fields([
+    {
+      name: "videoFile",
+      maxCount: 1,
+    },
+    {
+      name: "thumbnail",
+      maxCount: 1,
+    },
+  ]),
+  publishAVideo
+);
+
+router.route("/:videoId").patch(jwtVerify, updateVideo);
+router.route("/:videoId").delete(jwtVerify, deleteVideo);
+
+router.route("/toggle/publish/:videoId").patch(togglePublishStatus);
 
 export default router;
