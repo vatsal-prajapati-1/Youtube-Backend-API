@@ -1,6 +1,6 @@
-# Backend API for Video Platform
+# Youtube Backend API for Video Platform
 
-A robust backend API built with Node.js and Express for a video platform application. This API provides features for user authentication, video management, likes/comments system, and dashboard analytics.
+A robust Youtube backend API built with Node.js and Express for a video platform application. This API provides features for user authentication, video management, likes/comments system, and dashboard analytics.
 
 ## Features
 
