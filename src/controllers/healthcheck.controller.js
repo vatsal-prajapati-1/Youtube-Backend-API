@@ -12,8 +12,6 @@ const healthcheck = asyncHandler(async (req, res) => {
       mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
   };
 
-  console.log(process.uptime(), "process uptime ");
-
   try {
     return res
       .status(200)
