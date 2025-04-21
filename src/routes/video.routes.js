@@ -3,7 +3,9 @@ import {
   getAllVideos,
   getVideoById,
   publishAVideo,
-  updateVideo,
+  updateVideoDetails,
+  updateVideoFile,
+  updateVideoThumbnail,
   deleteVideo,
   getVideosByUser,
   togglePublishStatus,
@@ -39,7 +41,13 @@ router.route("/publish").post(
   publishAVideo
 );
 
-router.route("/:videoId").patch(jwtVerify, updateVideo);
+router.route("/update-video/:videoId").patch(jwtVerify, updateVideoDetails);
+router
+  .route("/update-video-file/:videoId")
+  .patch(jwtVerify, upload.single("videoFile"), updateVideoFile);
+router
+  .route("/update-thumbnail/:videoId")
+  .patch(jwtVerify, upload.single("thumbnail"), updateVideoThumbnail);
 router.route("/:videoId").delete(jwtVerify, deleteVideo);
 
 router.route("/toggle/publish/:videoId").patch(togglePublishStatus);

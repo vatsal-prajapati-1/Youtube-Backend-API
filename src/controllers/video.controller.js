@@ -2,6 +2,7 @@ import { Video } from "../models/video.models.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import { isValidObjectId } from "mongoose";
 import {
   deleteFromCloudinary,
   uploadOnCloudinary,
@@ -59,21 +60,18 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, video, "Video published successfully"));
+    .json(new ApiResponse(200, video, "Video published successfully"));
 });
 
-const updateVideo = asyncHandler(async (req, res) => {
+const updateVideoDetails = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+
+  if (!videoId) throw new ApiError(400, "Video ID is required");
+
   const { title, description } = req.body;
 
-  if (!title && !description) {
-    throw new ApiError(400, "Title or description is required");
-  }
-
-  const oldVideo = await Video.findById(videoId);
-  if (!oldVideo) {
-    throw new ApiError(404, "Video not found");
-  }
+  if (!title || !description)
+    throw new ApiError(400, "Title and description are required");
 
   const video = await Video.findByIdAndUpdate(
     videoId,
@@ -86,13 +84,82 @@ const updateVideo = asyncHandler(async (req, res) => {
     { new: true }
   );
 
-  if (!video) {
-    throw new ApiError(404, "Video not found");
-  }
+  if (!video) throw new ApiError(404, "Video not found");
 
   return res
     .status(200)
     .json(new ApiResponse(200, video, "Video updated successfully"));
+});
+
+const updateVideoFile = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  if (!videoId) throw new ApiError(400, "Video ID is required");
+
+  const videoFileLocalPath = req.file?.path;
+
+  if (!videoFileLocalPath) throw new ApiError(400, "Video file is required");
+
+  const video = await Video.findById(videoId);
+
+  if (!video) throw new ApiError(404, "Video not found");
+
+  if (video.videoFile) await deleteFromCloudinary(video.videoFile);
+
+  const videoFile = await uploadOnCloudinary(videoFileLocalPath);
+
+  if (!videoFile) throw new ApiError(500, "Error uploading video file");
+
+  const updateVideoFile = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        videoFile: videoFile.url,
+        duration: videoFile.duration,
+      },
+    },
+    { new: true }
+  );
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updateVideoFile, "Video updated successfully"));
+});
+
+const updateVideoThumbnail = asyncHandler(async (req, res) => {
+  const { videoId } = req.params;
+
+  if (!videoId) throw new ApiError(400, "Video ID is required");
+
+  const thumbnailLocalPath = req.file?.path;
+
+  if (!thumbnailLocalPath) throw new ApiError(400, "Thumbnail is required");
+
+  const video = await Video.findById(videoId);
+
+  if (!video) throw new ApiError(404, "Video not found");
+
+  if (video.thumbnail) await deleteFromCloudinary(video.thumbnail);
+
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  if (!thumbnail) throw new ApiError(500, "Error uploading thumbnail");
+
+  const updateVideoThumbnail = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        thumbnail: thumbnail.url,
+      },
+    },
+    { new: true }
+  );
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updateVideoThumbnail, "Video updated successfully")
+    );
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
@@ -129,8 +196,12 @@ const getVideosByUser = asyncHandler(async (req, res) => {
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
 
-  if (!videoId || !isValidObjectId(videoId)) {
-    throw new ApiError(404, "Video not found!");
+  if (!videoId) {
+    throw new ApiError(400, "Video ID is required!");
+  }
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID format!");
   }
 
   const video = await Video.findById(videoId);
@@ -225,7 +296,9 @@ export {
   getAllVideos,
   getVideoById,
   publishAVideo,
-  updateVideo,
+  updateVideoDetails,
+  updateVideoFile,
+  updateVideoThumbnail,
   deleteVideo,
   getVideosByUser,
   togglePublishStatus,
