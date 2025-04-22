@@ -228,7 +228,14 @@ const getAllVideosOfAChannel = asyncHandler(async (req, res) => {
   if (!name) throw new ApiError(400, "Channel name is required");
 
   const videos = await Video.aggregatePaginate(
-    Video.find({ channel: name, isPublished: true }),
+    Video.aggregate([
+      {
+        $match: {
+          channel: name,
+          isPublished: true,
+        },
+      },
+    ]),
     {
       page,
       limit,
@@ -253,7 +260,14 @@ const getAllVideosOfACategory = asyncHandler(async (req, res) => {
   if (!name) throw new ApiError(400, "Category ID is required");
 
   const videos = await Video.aggregatePaginate(
-    Video.find({ category: name, isPublished: true }),
+    Video.aggregate([
+      {
+        $match: {
+          category: name,
+          isPublished: true,
+        },
+      },
+    ]),
     {
       page,
       limit,
@@ -276,7 +290,14 @@ const getAllVideosOfATag = asyncHandler(async (req, res) => {
   if (!tag) throw new ApiError(400, "Tag is required");
 
   const videos = await Video.aggregatePaginate(
-    Video.find({ tags: tag, isPublished: true }),
+    Video.aggregate([
+      {
+        $match: {
+          tags: tag,
+          isPublished: true,
+        },
+      },
+    ]),
     {
       page,
       limit,
