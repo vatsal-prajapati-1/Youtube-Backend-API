@@ -23,7 +23,7 @@ const createPlaylist = asyncHandler(async (req, res) => {
 
   return res
     .status(201)
-    .json(new ApiResponse(201, playlist, "Playlist created successfully"));
+    .json(new ApiResponse(200, playlist, "Playlist created successfully"));
 });
 
 const getUserPlaylists = asyncHandler(async (req, res) => {
@@ -153,6 +153,18 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
     );
 });
 
+const getAllPlaylists = asyncHandler(async (req, res) => {
+  const playlists = await Playlist.find({}).sort({ createdAt: -1 });
+
+  if (!playlists) throw new ApiError(404, "No playlists found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, playlists, "All playlists fetched successfully")
+    );
+});
+
 export {
   createPlaylist,
   getUserPlaylists,
@@ -161,4 +173,5 @@ export {
   deletePlaylist,
   addVideoToPlaylist,
   removeVideoFromPlaylist,
+  getAllPlaylists,
 };
