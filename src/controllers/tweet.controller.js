@@ -4,6 +4,18 @@ import ApiResponse from "../utils/ApiResponse.js";
 import { Tweet } from "../models/tweet.models.js";
 import mongoose, { isValidObjectId } from "mongoose";
 
+const getAllTweets = asyncHandler(async (req, res) => {
+  const tweets = await Tweet.find().sort({ createdAt: -1 });
+
+  if (!tweets || tweets.length === 0) {
+    throw new ApiError(404, "No tweets found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, tweets, "Tweets fetched successfully"));
+});
+
 const createTweet = asyncHandler(async (req, res) => {
   const { content } = req.body;
 
@@ -82,7 +94,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
 const getUserTweet = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  if (!id || isValidObjectId(id))
+  if (!id || !isValidObjectId(id))
     throw new ApiError(400, "User id is required");
 
   const tweets = await Tweet.aggregate([
@@ -119,4 +131,4 @@ const getUserTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, tweets, "Tweets fetched successfully"));
 });
 
-export { createTweet, updateTweet, deleteTweet, getUserTweet };
+export { createTweet, updateTweet, deleteTweet, getUserTweet, getAllTweets };
